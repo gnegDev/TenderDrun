@@ -40,9 +40,9 @@ CSV_OPTS = dict(
 STE_COLS = ["ste_id", "name", "category", "attributes"]
 # Для контрактов имена колонок уточняются после просмотра первой строки
 CONTRACT_COLS_DEFAULT = [
-    "contract_id", "ste_id", "inn", "customer_name",
-    "supplier_inn", "supplier_name", "purchase_name",
-    "contract_date", "contract_sum",
+    "purchase_name", "contract_id", "ste_id", "contract_date", "contract_sum",
+    "inn", "customer_name", "customer_region",
+    "supplier_inn", "supplier_name", "supplier_region",
 ]
 
 

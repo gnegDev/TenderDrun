@@ -9,7 +9,10 @@ RUN pip install --no-cache-dir \
     psycopg2-binary==2.9.10 \
     httpx==0.28.1 \
     pydantic==2.12.5 \
-    pandas==2.2.3
+    pandas==2.2.3 \
+    jinja2==3.1.6 \
+    aiofiles==24.1.0 \
+    python-multipart==0.0.22
 
 COPY . .
 

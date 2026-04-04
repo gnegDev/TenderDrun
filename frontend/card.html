@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Портал Поставщиков — Карточка товара</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="index.html">
+      <img src="лого.svg" alt="Портал Поставщиков" style="height:36px;">
+    </a>
+
+    <div style="position:relative">
+      <button class="region-btn" onclick="toggleDropdown('region-dd')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        <span id="region-label">Москва</span>
+        <span class="chevron" id="region-chevron">▾</span>
+      </button>
+      <div class="dropdown hidden" id="region-dd" style="top:calc(100% + 4px); left:0;">
+        <div class="dropdown-item active" onclick="setRegion('Москва')">Москва</div>
+        <div class="dropdown-item" onclick="setRegion('Московская область')">Московская область</div>
+        <div class="dropdown-item" onclick="setRegion('Санкт-Петербург')">Санкт-Петербург</div>
+        <div class="dropdown-item" onclick="setRegion('Казань')">Казань</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="cart-btn" onclick="openCart()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="cart-badge" id="cart-badge">2</span>
+      </button>
+
+      <div style="position:relative" id="auth-wrap">
+        <button class="auth-btn" id="auth-btn" onclick="toggleDropdown('auth-dd')">Войти</button>
+        <button class="avatar-btn hidden" id="avatar-btn" onclick="toggleDropdown('auth-dd')">ДП</button>
+        <div class="dropdown auth-dropdown hidden" id="auth-dd" style="top:calc(100% + 8px); right:0;">
+          <div id="auth-login-form">
+            <h3>Войти в систему</h3>
+            <label>ИНН организации</label>
+            <input type="text" id="inn-input" value="7724909851" placeholder="Введите ИНН">
+            <button class="btn-red" onclick="doLogin()">Войти</button>
+          </div>
+          <div class="hidden" id="auth-profile">
+            <div class="profile-info">
+              <strong id="profile-name">Детская городская поликлиника №39</strong>
+              <span id="profile-inn" style="color:var(--gray);font-size:13px;">ИНН: 7724909851</span>
+            </div>
+            <button class="btn-logout" onclick="doLogout()">Выйти</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- CART DRAWER -->
+<div class="overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="drawer-header">
+    <h2>Корзина</h2>
+    <button class="close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cart-items-list"></div>
+  <div class="cart-footer">
+    <div class="cart-total">
+      <span>Итого</span>
+      <span id="cart-total-price">1 500 ₽</span>
+    </div>
+    <button class="btn-red-full">Оформить заказ</button>
+  </div>
+</div>
+
+<!-- QUOTE MODAL -->
+<div class="modal-overlay" id="quote-modal">
+  <div class="modal">
+    <h2>Создать котировочную сессию</h2>
+    <p class="modal-meta">Перчатки латексные нестерильные · ООО "Первый Гос. Поставщик"</p>
+    <label>Количество (шт)</label>
+    <input type="number" value="50" min="1" id="quote-qty">
+    <label>Срок поставки</label>
+    <input type="date" id="quote-date">
+    <div class="modal-btns">
+      <button class="btn-outline" onclick="closeModal()">Отменить</button>
+      <button class="btn-red-modal" onclick="createQuote()">Создать</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<main>
+  <div class="breadcrumb">
+    <a href="search.html">← Назад к результатам</a>
+    <span>›</span>
+    <span>Перчатки латексные нестерильные, 100 шт, р-р M</span>
+  </div>
+
+  <div class="product-layout">
+    <div class="product-main">
+      <div class="product-visual">
+        <svg class="product-visual-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M22 12h-4l-3 9L9 3l-3 9H2"/></svg>
+        <span class="product-visual-cat">Медицина</span>
+        <div class="product-visual-badges">
+          <span class="badge badge-frequent hidden" id="pv-badge-frequent">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Часто покупаете
+          </span>
+          <span class="badge badge-ai hidden" id="pv-badge-ai">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+            AI рекомендует
+          </span>
+        </div>
+        <span class="product-visual-label">Востребованная продукция</span>
+      </div>
+
+      <div class="product-id">Реестровый №: ПКРУ-570824-2025</div>
+      <h1 class="product-title">Перчатки латексные нестерильные, 100 шт, р-р M</h1>
+      <div class="product-attrs">
+        <span class="attr-pill">Латекс</span>
+        <span class="attr-pill">Нестерильные</span>
+        <span class="attr-pill">Размер M</span>
+        <span class="attr-pill">100 шт</span>
+        <span class="attr-pill">ГОСТ Р 52238</span>
+      </div>
+
+      <table class="chars-table">
+        <tr><td>Материал</td><td>Латекс натуральный</td></tr>
+        <tr><td>Тип</td><td>Нестерильные</td></tr>
+        <tr><td>Размер</td><td>M (средний)</td></tr>
+        <tr><td>Количество в упаковке</td><td>100 шт</td></tr>
+        <tr><td>Цвет</td><td>Натуральный, белый</td></tr>
+        <tr><td>Длина</td><td>240 мм</td></tr>
+        <tr><td>Срок годности</td><td>5 лет</td></tr>
+        <tr><td>Код КТРУ</td><td>32.50.13.130-00000001</td></tr>
+      </table>
+
+      <div class="history-block hidden" id="product-history">
+        <div class="history-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          История закупок
+        </div>
+        <table class="history-table">
+          <thead>
+            <tr><th>Дата</th><th>Кол-во</th><th>Поставщик</th><th>Сумма</th></tr>
+          </thead>
+          <tbody>
+            <tr><td>12.11.2025</td><td>50 шт</td><td>ООО "МедСнаб"</td><td>22 500 ₽</td></tr>
+            <tr><td>05.09.2025</td><td>30 шт</td><td>ЗАО "АльянсМедика"</td><td>13 800 ₽</td></tr>
+            <tr><td>18.06.2025</td><td>40 шт</td><td>ООО "МедСнаб"</td><td>16 100 ₽</td></tr>
+          </tbody>
+        </table>
+        <div class="history-summary">Итого закупок: 3 раза · Общая сумма: 52 400 ₽</div>
+      </div>
+
+      <div class="why-block hidden" id="product-why">
+        <div class="why-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+          Почему эта позиция рекомендована вам
+        </div>
+        <div class="progress-item">
+          <div class="progress-label"><span>Частота закупок</span><span>45%</span></div>
+          <div class="progress-bar"><div class="progress-fill fill-green" style="width:45%"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="progress-label"><span>Давность последней закупки</span><span>30%</span></div>
+          <div class="progress-bar"><div class="progress-fill fill-blue" style="width:30%"></div></div>
+        </div>
+        <div class="progress-item">
+          <div class="progress-label"><span>Популярность среди схожих организаций</span><span>25%</span></div>
+          <div class="progress-bar"><div class="progress-fill fill-teal" style="width:25%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <aside class="product-sidebar">
+      <div class="offer-card">
+        <div class="offer-label">Лучшее предложение</div>
+        <div class="offer-price">450 ₽ <span style="font-size:18px;font-weight:400">/ шт</span></div>
+        <div style="margin-bottom:8px">
+          <span class="offer-original">480 ₽</span>
+          <span class="discount-badge">−5%</span>
+        </div>
+        <div class="offer-supplier" onclick="showToast('Переход на страницу поставщика')">ООО "Первый Гос. Поставщик"</div>
+        <div class="offer-meta">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="3" width="15" height="13"/><polygon points="16 8 20 8 23 11 23 16 16 16 16 8"/><circle cx="5.5" cy="18.5" r="2.5"/><circle cx="18.5" cy="18.5" r="2.5"/></svg>
+          Доставка 5 рабочих дней
+        </div>
+        <div class="offer-meta">В наличии: 250 шт</div>
+        <hr class="offer-divider">
+        <button class="btn-red-w" onclick="openModal()">Создать котировочную сессию</button>
+        <button class="btn-outline-w" onclick="addToCart('Перчатки латексные',450);showToast('Перчатки латексные добавлены в корзину')">Добавить в корзину</button>
+        <a class="compare-link">Сравнить цены: 3 предложения ↓</a>
+      </div>
+
+      <div class="all-offers">
+        <div class="all-offers-title">Все предложения (3)</div>
+        <div class="offer-row">
+          <div class="offer-row-price">450 ₽/шт</div>
+          <div class="offer-row-supplier">ООО "Первый Гос. Поставщик"</div>
+          <div class="offer-row-meta">5 дней · 48 контрактов</div>
+        </div>
+        <div class="offer-row">
+          <div class="offer-row-price">462 ₽/шт</div>
+          <div class="offer-row-supplier">ЗАО "АльянсМедика"</div>
+          <div class="offer-row-meta">7 дней · 23 контракта</div>
+        </div>
+        <div class="offer-row">
+          <div class="offer-row-price">490 ₽/шт</div>
+          <div class="offer-row-supplier">ООО "МедСнаб"</div>
+          <div class="offer-row-meta">3 дня · 112 контрактов</div>
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div class="bottom-section">
+    <div class="bottom-section-title">Часто покупают вместе</div>
+    <div class="products-grid-4" id="together-grid"></div>
+  </div>
+
+  <div class="bottom-section">
+    <div class="analogs-bg">
+      <div class="bottom-section-title">
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+        Аналоги с лучшей ценой
+      </div>
+      <div class="analogs-track" id="analogs-track"></div>
+    </div>
+  </div>
+
+  <div class="bottom-section hidden" id="viewed-section">
+    <div class="bottom-section-title">
+      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+      Вы смотрели
+    </div>
+    <div class="analogs-track" id="viewed-track"></div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/data.js"></script>
+<script src="js/common.js"></script>
+<script src="js/card.js"></script>
+</body>
+</html>

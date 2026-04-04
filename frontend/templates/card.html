@@ -1,0 +1,149 @@
+{% extends "base.html" %}
+{% block title %}{{ ste.name }} — Портал Поставщиков{% endblock %}
+{% block content %}
+<main>
+  <div class="breadcrumb">
+    <a href="/search?q={{ query | urlencode }}{% if inn %}&inn={{ inn }}{% endif %}">← Назад к результатам</a>
+    <span>›</span>
+    <span>{{ ste.name }}</span>
+  </div>
+
+  <div class="product-layout">
+    <div class="product-main">
+      <div class="product-visual">
+        <svg class="product-visual-icon" width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="10"/></svg>
+        <span class="product-visual-cat">{{ ste.category or 'СТЕ' }}</span>
+        {% if inn %}
+        <div class="product-visual-badges">
+          {% if 'frequent' in badges %}
+          <span class="badge badge-frequent">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            Часто покупаете
+          </span>
+          {% endif %}
+          {% if 'ai' in badges %}
+          <span class="badge badge-ai">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+            AI рекомендует
+          </span>
+          {% endif %}
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="product-id">Реестровый №: {{ ste.ste_id }}</div>
+      <h1 class="product-title">{{ ste.name }}</h1>
+
+      {% if attributes %}
+      <div class="product-attrs">
+        {% for attr in attributes %}
+        <span class="attr-pill">{{ attr }}</span>
+        {% endfor %}
+      </div>
+      {% endif %}
+
+      {% if inn and purchase_history %}
+      <div class="history-block">
+        <div class="history-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          История закупок
+        </div>
+        <table class="history-table">
+          <thead>
+            <tr><th>Дата</th><th>Поставщик</th><th>Сумма</th></tr>
+          </thead>
+          <tbody>
+            {% for h in purchase_history %}
+            <tr>
+              <td>{{ h.date }}</td>
+              <td>{{ h.supplier }}</td>
+              <td>{{ h.sum }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <div class="history-summary">
+          Итого закупок: {{ total_purchases }} раз · Общая сумма: {{ total_sum }}
+        </div>
+      </div>
+      {% endif %}
+
+      {% if inn and explain %}
+      <div class="why-block">
+        <div class="why-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+          Почему эта позиция рекомендована вам
+        </div>
+        {% for r in explain.reasons %}
+        <div class="progress-item">
+          <div class="progress-label">
+            <span>{{ r.label }}</span><span>{{ r.value }}%</span>
+          </div>
+          <div class="progress-bar">
+            <div class="progress-fill fill-green" style="width:{{ r.value }}%"></div>
+          </div>
+        </div>
+        {% endfor %}
+      </div>
+      {% endif %}
+    </div>
+
+    <aside class="product-sidebar">
+      <div class="offer-card">
+        {% if best_offer %}
+        <div class="offer-label">Лучшее предложение</div>
+        <div class="offer-price">{{ best_offer.sum_fmt }}</div>
+        <div class="offer-supplier">{{ best_offer.supplier }}</div>
+        <div class="offer-meta">Последний контракт: {{ best_offer.date }}</div>
+        {% if offers | length > 1 %}
+        <hr class="offer-divider">
+        <div class="all-offers-title">Все предложения ({{ offers | length }})</div>
+        {% for offer in offers %}
+        <div class="offer-row">
+          <div class="offer-row-price">{{ offer.sum_fmt }}</div>
+          <div class="offer-row-supplier">{{ offer.supplier }}</div>
+          <div class="offer-row-meta">{{ offer.date }}</div>
+        </div>
+        {% endfor %}
+        {% endif %}
+        {% else %}
+        <div class="offer-label">Предложения</div>
+        <div style="font-size:14px;color:var(--gray);margin-top:8px;">
+          Нет данных о контрактах для этой позиции
+        </div>
+        {% endif %}
+      </div>
+    </aside>
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  const _enterTime = Date.now();
+  const _steId = "{{ ste.ste_id }}";
+  const _position = {{ position }};
+  let _beaconSent = false;
+
+  function _sendLeaveEvent() {
+    if (_beaconSent || !INN || !_steId) return;
+    _beaconSent = true;
+    const dwellMs = Date.now() - _enterTime;
+    const eventType = dwellMs < 3000 ? 'quick_return' : 'dwell';
+    navigator.sendBeacon(
+      '/api/event',
+      new Blob([JSON.stringify({
+        inn: INN,
+        query: CURRENT_QUERY,
+        ste_id: _steId,
+        position: _position,
+        event_type: eventType,
+        dwell_ms: dwellMs,
+      })], { type: 'application/json' })
+    );
+  }
+
+  window.addEventListener('pagehide', _sendLeaveEvent);
+  window.addEventListener('beforeunload', _sendLeaveEvent);
+</script>
+{% endblock %}

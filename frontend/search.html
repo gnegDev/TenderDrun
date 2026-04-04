@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Портал Поставщиков — Поиск</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="css/styles.css">
+</head>
+<body>
+
+<!-- HEADER -->
+<header>
+  <div class="header-inner">
+    <a class="logo" href="index.html">
+      <img src="лого.svg" alt="Портал Поставщиков" style="height:36px;">
+    </a>
+
+    <div style="position:relative">
+      <button class="region-btn" onclick="toggleDropdown('region-dd')">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5-1.12 2.5-2.5 2.5z"/></svg>
+        <span id="region-label">Москва</span>
+        <span class="chevron" id="region-chevron">▾</span>
+      </button>
+      <div class="dropdown hidden" id="region-dd" style="top:calc(100% + 4px); left:0;">
+        <div class="dropdown-item active" onclick="setRegion('Москва')">Москва</div>
+        <div class="dropdown-item" onclick="setRegion('Московская область')">Московская область</div>
+        <div class="dropdown-item" onclick="setRegion('Санкт-Петербург')">Санкт-Петербург</div>
+        <div class="dropdown-item" onclick="setRegion('Казань')">Казань</div>
+      </div>
+    </div>
+
+    <div class="header-right">
+      <button class="cart-btn" onclick="openCart()">
+        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="cart-badge" id="cart-badge">2</span>
+      </button>
+
+      <div style="position:relative" id="auth-wrap">
+        <button class="auth-btn" id="auth-btn" onclick="toggleDropdown('auth-dd')">Войти</button>
+        <button class="avatar-btn hidden" id="avatar-btn" onclick="toggleDropdown('auth-dd')">ДП</button>
+        <div class="dropdown auth-dropdown hidden" id="auth-dd" style="top:calc(100% + 8px); right:0;">
+          <div id="auth-login-form">
+            <h3>Войти в систему</h3>
+            <label>ИНН организации</label>
+            <input type="text" id="inn-input" value="7724909851" placeholder="Введите ИНН">
+            <button class="btn-red" onclick="doLogin()">Войти</button>
+          </div>
+          <div class="hidden" id="auth-profile">
+            <div class="profile-info">
+              <strong id="profile-name">Детская городская поликлиника №39</strong>
+              <span id="profile-inn" style="color:var(--gray);font-size:13px;">ИНН: 7724909851</span>
+            </div>
+            <button class="btn-logout" onclick="doLogout()">Выйти</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<!-- CART DRAWER -->
+<div class="overlay" id="cart-overlay" onclick="closeCart()"></div>
+<div class="cart-drawer" id="cart-drawer">
+  <div class="drawer-header">
+    <h2>Корзина</h2>
+    <button class="close-btn" onclick="closeCart()">✕</button>
+  </div>
+  <div class="cart-items" id="cart-items-list"></div>
+  <div class="cart-footer">
+    <div class="cart-total">
+      <span>Итого</span>
+      <span id="cart-total-price">1 500 ₽</span>
+    </div>
+    <button class="btn-red-full">Оформить заказ</button>
+  </div>
+</div>
+
+<div id="toast-container"></div>
+
+<main>
+  <!-- Sticky search bar -->
+  <div class="search-sticky">
+    <div class="search-wrap" style="max-width:100%">
+      <div class="search-container">
+        <input class="search-box compact" id="search-page-input" type="text" autocomplete="off"
+          oninput="updateSearchDropdown('search-page-input','search-page-dd')"
+          onfocus="showSearchDd('search-page-dd')"
+          onkeydown="if(event.key==='Enter')doSearch(this.value)">
+        <button class="search-btn" onclick="doSearch(document.getElementById('search-page-input').value)">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        </button>
+        <div class="search-dropdown hidden" id="search-page-dd"></div>
+      </div>
+    </div>
+    <div class="synonyms">
+      <span class="synonyms-label">Также ищут:</span>
+      <button class="synonym-btn" onclick="doSearch('перчатки медицинские')">перчатки медицинские</button>
+      <button class="synonym-btn" onclick="doSearch('нитриловые перчатки')">нитриловые перчатки</button>
+      <button class="synonym-btn" onclick="doSearch('латексные перчатки')">латексные перчатки</button>
+      <button class="synonym-btn" onclick="doSearch('защитные перчатки')">защитные перчатки</button>
+    </div>
+  </div>
+
+  <div class="search-layout">
+    <!-- Sidebar filters -->
+    <aside class="sidebar">
+      <div class="filter-box">
+        <div class="filter-header">
+          <span class="filter-title">Фильтры</span>
+          <button class="filter-reset" onclick="resetFilters()">Сбросить</button>
+        </div>
+        <div class="filter-group">
+          <p class="filter-group-title">Категория</p>
+          <label class="checkbox-label">
+            <input type="checkbox" checked id="filter-medical"> Медицина <span class="checkbox-count">1 024</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="filter-hardware"> Хозтовары <span class="checkbox-count">223</span>
+          </label>
+          <label class="checkbox-label">
+            <input type="checkbox" id="filter-stationery"> Канцелярия <span class="checkbox-count">456</span>
+          </label>
+        </div>
+        <div class="filter-group">
+          <p class="filter-group-title">Цена, ₽</p>
+          <div class="price-inputs">
+            <input class="price-input" type="number" placeholder="от" id="price-from">
+            <input class="price-input" type="number" placeholder="до" id="price-to">
+          </div>
+        </div>
+        <div class="filter-group">
+          <label class="checkbox-label">
+            <input type="checkbox" checked id="filter-offers"> Только с предложениями
+          </label>
+        </div>
+        <button class="btn-apply" onclick="applyFilters()">Применить</button>
+      </div>
+    </aside>
+
+    <!-- Results -->
+    <div class="results-area">
+      <div class="personal-box hidden" id="personal-box">
+        <div class="personal-box-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+          Персональная выдача активна
+        </div>
+        <p>Результаты отсортированы с учётом ваших предыдущих закупок</p>
+        <button class="personal-box-toggle" onclick="togglePersonal()">Показать общую выдачу ↓</button>
+      </div>
+
+      <div class="results-header">
+        <div>
+          <div class="results-count">Найдено <span id="results-count">247</span> позиций</div>
+          <div class="results-meta hidden" id="personal-order-label">Персональный порядок</div>
+        </div>
+        <select class="sort-select" id="sort-select" onchange="renderSearch()">
+          <option value="relevance">Релевантность</option>
+          <option value="price-asc">Цена: по возрастанию</option>
+          <option value="price-desc">Цена: по убыванию</option>
+          <option value="offers">По количеству предложений</option>
+        </select>
+      </div>
+
+      <!-- Quick reorder (authorized only) -->
+      <div class="reorder-section hidden" id="reorder-section">
+        <div class="reorder-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Вы закупали это раньше
+        </div>
+        <div class="reorder-list">
+          <div class="reorder-card">
+            <div class="reorder-card-title">Перчатки латексные нестерильные, 100 шт, р-р M</div>
+            <div class="reorder-card-date">Последняя закупка: ноябрь 2025</div>
+            <button class="btn-reorder" onclick="addToCart('Перчатки латексные',450); showToast('Добавлено в корзину')">Повторить</button>
+          </div>
+          <div class="reorder-card">
+            <div class="reorder-card-title">Маски медицинские трёхслойные с регистрационным...</div>
+            <div class="reorder-card-date">Последняя закупка: октябрь 2025</div>
+            <button class="btn-reorder" onclick="addToCart('Маски медицинские',150); showToast('Добавлено в корзину')">Повторить</button>
+          </div>
+          <div class="reorder-card">
+            <div class="reorder-card-title">Шприц инъекционный одноразовый 5 мл</div>
+            <div class="reorder-card-date">Последняя закупка: сентябрь 2025</div>
+            <button class="btn-reorder" onclick="addToCart('Шприц 5мл',120); showToast('Добавлено в корзину')">Повторить</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="products-grid" id="search-products-grid"></div>
+
+      <div class="pagination">
+        <button class="page-btn" id="pg-prev" onclick="changePage(-1)">‹</button>
+        <button class="page-btn active" id="pg-1" onclick="setPage(1)">1</button>
+        <button class="page-btn" id="pg-2" onclick="setPage(2)">2</button>
+        <button class="page-btn" id="pg-3" onclick="setPage(3)">3</button>
+        <button class="page-btn ellipsis">…</button>
+        <button class="page-btn" id="pg-10" onclick="setPage(10)">10</button>
+        <button class="page-btn" id="pg-next" onclick="changePage(1)">›</button>
+      </div>
+    </div>
+  </div>
+</main>
+
+<script src="js/api.js"></script>
+<script src="js/data.js"></script>
+<script src="js/common.js"></script>
+<script src="js/search.js"></script>
+</body>
+</html>
