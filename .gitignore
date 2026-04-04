@@ -1,0 +1,16 @@
+# PyCharm / JetBrains files
+.idea/
+*.iws
+*.iml
+*.ipr
+
+# Python specific
+__pycache__/
+*.py[cod]
+*$py.class
+venv/
+.venv/
+env/
+
+.claude/
+data/
