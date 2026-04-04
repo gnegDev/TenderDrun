@@ -1,0 +1,158 @@
+{% extends "base.html" %}
+{% block title %}{% if query %}{{ query }} — {% endif %}Портал Поставщиков — Поиск{% endblock %}
+{% block content %}
+<main>
+  <div class="search-sticky">
+    <div class="search-wrap" style="max-width:100%">
+      <form method="get" action="/search">
+        {% if inn %}<input type="hidden" name="inn" value="{{ inn }}">{% endif %}
+        <div class="search-container">
+          <input class="search-box compact" name="q" type="text"
+            value="{{ query }}" autocomplete="off">
+          <button type="submit" class="search-btn">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </button>
+        </div>
+      </form>
+    </div>
+
+    {% if suggested_query %}
+    <div class="synonyms">
+      <span class="synonyms-label">ИИ предлагает:</span>
+      <a href="/search?q={{ suggested_query | urlencode }}{% if inn %}&inn={{ inn }}{% endif %}"
+         class="synonym-btn" style="border-color:var(--teal);color:var(--teal);font-weight:600;">
+        {{ suggested_query }}
+      </a>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="search-layout">
+    <aside class="sidebar">
+      <div class="filter-box">
+        <form method="get" action="/search">
+          {% if inn %}<input type="hidden" name="inn" value="{{ inn }}">{% endif %}
+          <input type="hidden" name="q" value="{{ query }}">
+          <div class="filter-header">
+            <span class="filter-title">Сортировка</span>
+          </div>
+          <select name="sort" class="sort-select" onchange="this.form.submit()"
+                  style="width:100%;margin-top:8px;margin-bottom:12px;">
+            <option value="relevance" {% if sort == 'relevance' %}selected{% endif %}>Релевантность</option>
+            <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
+          </select>
+        </form>
+      </div>
+    </aside>
+
+    <div class="results-area">
+      {% if is_personalized %}
+      <div class="personal-box">
+        <div class="personal-box-header">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+          Персональная выдача активна
+        </div>
+        <p>Результаты отсортированы с учётом ваших предыдущих закупок</p>
+      </div>
+      {% endif %}
+
+      <div class="results-header">
+        <div>
+          <div class="results-count">Найдено <span>{{ total }}</span> позиций</div>
+          {% if is_personalized %}
+          <div class="results-meta">Персональный порядок</div>
+          {% endif %}
+        </div>
+      </div>
+
+      <div class="products-grid">
+        {% for item in results %}
+        <a href="/card/{{ item.ste_id }}?inn={{ inn }}&query={{ query | urlencode }}&position={{ loop.index }}"
+           class="product-card grid-card"
+           style="text-decoration:none;color:inherit;"
+           onclick="trackClick('{{ item.ste_id }}', {{ loop.index }})">
+
+          <div class="card-icon-wrap">
+            <span class="card-category">{{ item.category or 'СТЕ' }}</span>
+            <span class="card-status" style="margin-left:auto">● Активна</span>
+          </div>
+
+          {% if item.get('badges') %}
+          <div class="badges">
+            {% if 'frequent' in item.badges %}
+            <span class="badge badge-frequent">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+              Часто покупаете
+            </span>
+            {% endif %}
+            {% if 'ai' in item.badges %}
+            <span class="badge badge-ai">
+              <svg width="9" height="9" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+              AI рекомендует
+            </span>
+            {% endif %}
+          </div>
+          {% endif %}
+
+          <div class="card-title">{{ item.name }}</div>
+
+          {% if item.get('reason') and inn %}
+          <div style="font-size:12px;color:var(--teal);margin-top:4px;margin-bottom:4px;">
+            {{ item.reason }}
+          </div>
+          {% endif %}
+
+          <div class="card-footer">
+            <div class="card-price">{{ item.get('best_price') or '—' }}</div>
+          </div>
+        </a>
+        {% else %}
+        {% if query %}
+        <div style="grid-column:1/-1;text-align:center;padding:48px;color:var(--gray)">
+          По запросу «{{ query }}» ничего не найдено
+        </div>
+        {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if total_pages > 1 %}
+      {% set win_start = [page - 4, 1] | max %}
+      {% set win_end   = [win_start + 9, total_pages] | min %}
+      {% set win_start = [win_end - 9, 1] | max %}
+      <div class="pagination">
+        {% if page > 1 %}
+        <a href="/search?q={{ query | urlencode }}&inn={{ inn }}&sort={{ sort }}&page={{ page - 1 }}"
+           class="page-btn">‹</a>
+        {% endif %}
+
+        {% if win_start > 1 %}
+        <a href="/search?q={{ query | urlencode }}&inn={{ inn }}&sort={{ sort }}&page=1"
+           class="page-btn">1</a>
+        {% if win_start > 2 %}
+        <span class="page-btn ellipsis">…</span>
+        {% endif %}
+        {% endif %}
+
+        {% for p in range(win_start, win_end + 1) %}
+        <a href="/search?q={{ query | urlencode }}&inn={{ inn }}&sort={{ sort }}&page={{ p }}"
+           class="page-btn {% if p == page %}active{% endif %}">{{ p }}</a>
+        {% endfor %}
+
+        {% if win_end < total_pages %}
+        {% if win_end < total_pages - 1 %}
+        <span class="page-btn ellipsis">…</span>
+        {% endif %}
+        <a href="/search?q={{ query | urlencode }}&inn={{ inn }}&sort={{ sort }}&page={{ total_pages }}"
+           class="page-btn">{{ total_pages }}</a>
+        {% endif %}
+
+        {% if page < total_pages %}
+        <a href="/search?q={{ query | urlencode }}&inn={{ inn }}&sort={{ sort }}&page={{ page + 1 }}"
+           class="page-btn">›</a>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+</main>
+{% endblock %}

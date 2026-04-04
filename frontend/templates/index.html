@@ -1,0 +1,72 @@
+{% extends "base.html" %}
+{% block title %}Портал Поставщиков — Главная{% endblock %}
+{% block content %}
+<main>
+  <div class="hero">
+    <p class="hero-label">Умный поиск СТЕ</p>
+    <h1>Найдите нужную позицию<br>за секунды</h1>
+    <p class="hero-desc">Поиск с учётом истории ваших закупок, синонимов и автоисправлением</p>
+
+    {% if is_personalized %}
+    <div class="ai-badge">
+      <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2L9.09 8.26L2 9.27L7 14.14L5.82 21.02L12 17.77L18.18 21.02L17 14.14L22 9.27L14.91 8.26L12 2Z"/></svg>
+      Персональная выдача активна · {{ contracts_count }} ваших закупок учтены
+    </div>
+    {% endif %}
+
+    <div class="search-wrap">
+      <form method="get" action="/search">
+        {% if inn %}<input type="hidden" name="inn" value="{{ inn }}">{% endif %}
+        <div class="search-container">
+          <span class="search-icon-left">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+          </span>
+          <input class="search-box search-box-with-icon" name="q" type="text"
+            placeholder="{{ suggested_query or 'Поиск по наименованию, коду или характеристикам...' }}"
+            autocomplete="off">
+          <button type="submit" class="search-btn-text">Найти</button>
+        </div>
+      </form>
+
+      {% if suggested_query %}
+      <div style="font-size:13px;color:var(--teal);margin-top:8px;">
+        ИИ предлагает:
+        <a href="/search?q={{ suggested_query | urlencode }}{% if inn %}&inn={{ inn }}{% endif %}"
+           style="color:var(--teal);font-weight:600;text-decoration:underline;">
+          {{ suggested_query }}
+        </a>
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="section">
+    <div class="section-header">
+      <h2 class="section-title">
+        {% if is_personalized %}Рекомендации для вас{% else %}Рекомендации{% endif %}
+      </h2>
+    </div>
+    <div class="carousel-wrapper">
+      <div class="carousel-track" style="display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;">
+        {% for item in recommended %}
+        <a href="/card/{{ item.ste_id }}{% if inn %}?inn={{ inn }}{% endif %}"
+           class="product-card carousel-card" style="text-decoration:none;color:inherit;flex-shrink:0;">
+          <div class="card-icon-wrap">
+            <span class="card-category">{{ item.category or 'СТЕ' }}</span>
+            <span class="card-status" style="margin-left:auto">● Активна</span>
+          </div>
+          <div class="card-title">{{ item.name }}</div>
+          <div class="card-footer">
+            <div class="card-price">{{ rec_prices.get(item.ste_id) or '—' }}</div>
+          </div>
+        </a>
+        {% else %}
+        <div style="padding:32px;color:var(--gray)">
+          Нет данных. <a href="/search{% if inn %}?inn={{ inn }}{% endif %}">Перейти к поиску</a>
+        </div>
+        {% endfor %}
+      </div>
+    </div>
+  </div>
+</main>
+{% endblock %}

@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from sqlmodel import Field, SQLModel
+from  sqlmodel import Field, SQLModel
 
 
 class SteItem(SQLModel, table=True):
