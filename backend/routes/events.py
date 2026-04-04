@@ -33,6 +33,6 @@ async def record_event(body: EventRequest, session: Session = Depends(get_db)):
     session.add(event)
     session.commit()
 
-    asyncio.create_task(ml_client.reindex(body.inn))
+    asyncio.create_task(ml_client.send_event(body.inn, body.ste_id, body.event_type, body.dwell_ms))
 
     return {"status": "ok"}
