@@ -30,17 +30,52 @@
   <div class="search-layout">
     <aside class="sidebar">
       <div class="filter-box">
-        <form method="get" action="/search">
+        <form method="get" action="/search" id="filter-form">
           {% if inn %}<input type="hidden" name="inn" value="{{ inn }}">{% endif %}
           <input type="hidden" name="q" value="{{ query }}">
+
           <div class="filter-header">
-            <span class="filter-title">Сортировка</span>
+            <span class="filter-title">Фильтры</span>
+            <a href="/search?q={{ query | urlencode }}{% if inn %}&inn={{ inn }}{% endif %}"
+               class="filter-reset">Сбросить</a>
           </div>
-          <select name="sort" class="sort-select" onchange="this.form.submit()"
-                  style="width:100%;margin-top:8px;margin-bottom:12px;">
-            <option value="relevance" {% if sort == 'relevance' %}selected{% endif %}>Релевантность</option>
-            <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
-          </select>
+
+          <div class="filter-group">
+            <p class="filter-group-title">Категория</p>
+            <input type="text" name="category" value="{{ category }}"
+              placeholder="Например: Медицина"
+              style="width:100%;height:32px;padding:0 8px;box-sizing:border-box;
+                     border:1px solid var(--border2);border-radius:4px;
+                     font-family:inherit;font-size:13px;">
+          </div>
+
+          <div class="filter-group">
+            <p class="filter-group-title">Цена контракта, ₽</p>
+            <div class="price-inputs">
+              <input class="price-input" type="number" name="price_from"
+                     placeholder="от" value="{{ price_from }}">
+              <input class="price-input" type="number" name="price_to"
+                     placeholder="до" value="{{ price_to }}">
+            </div>
+          </div>
+
+          <div class="filter-group">
+            <label class="checkbox-label">
+              <input type="checkbox" name="has_offers" value="true"
+                {% if has_offers %}checked{% endif %}>
+              Только с предложениями
+            </label>
+          </div>
+
+          <div class="filter-group">
+            <p class="filter-group-title">Сортировка</p>
+            <select name="sort" class="sort-select" style="width:100%;">
+              <option value="relevance" {% if sort == 'relevance' %}selected{% endif %}>Релевантность</option>
+              <option value="price_asc" {% if sort == 'price_asc' %}selected{% endif %}>Цена: по возрастанию</option>
+            </select>
+          </div>
+
+          <button type="submit" class="btn-apply">Применить</button>
         </form>
       </div>
     </aside>

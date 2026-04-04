@@ -72,6 +72,10 @@ async def page_search(
     inn: str = "",
     sort: str = "relevance",
     page: int = 1,
+    category: str = "",
+    price_from: str = "",
+    price_to: str = "",
+    has_offers: str = "",
     db: Session = Depends(get_db),
 ):
     results = []
@@ -79,15 +83,59 @@ async def page_search(
     suggested_query = None
     is_personalized = False
     page_size = 12
+    _has_offers = has_offers in ("true", "on", "1", "yes")
+    _price_from = float(price_from.strip()) if price_from.strip() else None
+    _price_to = float(price_to.strip()) if price_to.strip() else None
 
     if q:
-        candidates_orm = db.exec(
-            select(SteItem).where(SteItem.name.ilike(f"%{q}%"))  # type: ignore[union-attr]
-        ).all()
-        candidates = [
-            {"ste_id": s.ste_id, "name": s.name, "category": s.category, "bm25_score": 1.0}
-            for s in candidates_orm
-        ]
+        from sqlalchemy import Float, literal_column, text
+        from sqlalchemy.orm import aliased
+
+        # Подзапрос: лучшая цена по каждой СТЕ
+        price_subq = (
+            select(Contract.ste_id, func.min(Contract.contract_sum).label("min_price"))
+            .where(Contract.contract_sum.is_not(None))  # type: ignore[union-attr]
+            .group_by(Contract.ste_id)
+            .subquery()
+        )
+
+        ste_query = (
+            select(SteItem, price_subq.c.min_price)
+            .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
+            .where(SteItem.name.ilike(f"%{q}%"))  # type: ignore[union-attr]
+        )
+
+        if category:
+            ste_query = ste_query.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
+
+        if _has_offers:
+            ste_query = ste_query.where(price_subq.c.min_price.is_not(None))
+
+        if _price_from is not None:
+            ste_query = ste_query.where(price_subq.c.min_price >= _price_from)
+
+        if _price_to is not None:
+            ste_query = ste_query.where(price_subq.c.min_price <= _price_to)
+
+        if sort == "price_asc":
+            ste_query = ste_query.order_by(price_subq.c.min_price.asc().nulls_last())
+
+        rows = db.exec(ste_query).all()
+
+        # Строим price_map и список кандидатов из одного запроса
+        price_map: dict[str, float] = {}
+        candidates = []
+        for row in rows:
+            ste_item = row[0]
+            min_price = row[1]
+            if min_price is not None:
+                price_map[ste_item.ste_id] = min_price
+            candidates.append({
+                "ste_id": ste_item.ste_id,
+                "name": ste_item.name,
+                "category": ste_item.category,
+                "bm25_score": 1.0,
+            })
 
         if inn and candidates:
             history_orm = db.exec(
@@ -105,10 +153,15 @@ async def page_search(
                 results = ml_response["results"]
                 suggested_query = ml_response.get("suggested_query")
                 is_personalized = True
+                if sort == "price_asc":
+                    results.sort(key=lambda x: price_map.get(x["ste_id"], float("inf")))
             else:
                 results = candidates
         else:
             results = candidates
+
+        if sort == "relevance":
+            results.sort(key=lambda x: x.get("score", 0), reverse=True)
 
         # Обогатить значками
         if inn:
@@ -125,27 +178,13 @@ async def page_search(
 
         total = len(results)
 
-        if sort == "relevance":
-            results.sort(key=lambda x: x.get("score", 0), reverse=True)
-
         offset = (page - 1) * page_size
         results = results[offset : offset + page_size]
 
-        # Лучшая цена для каждой позиции на текущей странице — один запрос
-        page_ste_ids = [r["ste_id"] for r in results]
-        if page_ste_ids:
-            price_rows = db.exec(
-                select(Contract.ste_id, func.min(Contract.contract_sum))
-                .where(
-                    Contract.ste_id.in_(page_ste_ids),  # type: ignore[attr-defined]
-                    Contract.contract_sum.is_not(None),  # type: ignore[union-attr]
-                )
-                .group_by(Contract.ste_id)
-            ).all()
-            price_map = {row[0]: row[1] for row in price_rows}
-            for item in results:
-                price = price_map.get(item["ste_id"])
-                item["best_price"] = f"от {int(price):,} ₽".replace(",", "\u00a0") if price else None
+        # Добавить best_price из уже построенного price_map
+        for item in results:
+            price = price_map.get(item["ste_id"])
+            item["best_price"] = f"от {int(price):,} ₽".replace(",", "\u00a0") if price else None
 
     total_pages = max(1, (total + page_size - 1) // page_size)
 
@@ -159,6 +198,10 @@ async def page_search(
         "total_pages": total_pages,
         "suggested_query": suggested_query,
         "is_personalized": is_personalized,
+        "category": category,
+        "price_from": price_from,
+        "price_to": price_to,
+        "has_offers": _has_offers,
     })
 
 
