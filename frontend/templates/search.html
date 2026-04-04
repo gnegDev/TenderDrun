@@ -28,7 +28,12 @@
   </div>
 
   <div class="search-layout">
-    <aside class="sidebar">
+    <button class="filter-toggle-btn" id="filter-toggle" onclick="toggleFilters()">
+      <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="4" y1="6" x2="20" y2="6"/><line x1="8" y1="12" x2="16" y2="12"/><line x1="10" y1="18" x2="14" y2="18"/></svg>
+      <span id="filter-toggle-label">Фильтры{% if category or price_from or price_to or has_offers %} (применены){% endif %}</span>
+    </button>
+
+    <aside class="sidebar" id="search-sidebar">
       <div class="filter-box">
         <form method="get" action="/search" id="filter-form">
           {% if inn %}<input type="hidden" name="inn" value="{{ inn }}">{% endif %}
@@ -190,4 +195,17 @@
     </div>
   </div>
 </main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleFilters() {
+    const sidebar = document.getElementById('search-sidebar');
+    const label = document.getElementById('filter-toggle-label');
+    const open = sidebar.classList.toggle('mobile-open');
+    label.textContent = open
+      ? 'Скрыть фильтры'
+      : 'Фильтры{% if category or price_from or price_to or has_offers %} (применены){% endif %}';
+  }
+</script>
 {% endblock %}
