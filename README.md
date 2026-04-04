@@ -7,9 +7,9 @@ docker compose up --build
 ```
 
 После старта:
-- Backend API: http://localhost:8000
+- Backend API: http://localhost:8080
 - ML-сервис (заглушка): http://localhost:8001
-- Документация API: http://localhost:8000/docs
+- Документация API: http://localhost:8080/docs
 
 ## Загрузка данных
 
@@ -36,7 +36,7 @@ DATABASE_URL=postgresql+psycopg2://postgres:postgres@localhost:5432/hackathon \
 Поиск СТЕ с персонализацией по ИНН.
 
 ```bash
-curl -X POST http://localhost:8000/search \
+curl -X POST http://localhost:8080/search \
   -H "Content-Type: application/json" \
   -d '{"query": "кабель медный", "inn": "7701234567"}'
 ```
@@ -55,7 +55,7 @@ curl -X POST http://localhost:8000/search \
 Запись поведенческого события.
 
 ```bash
-curl -X POST http://localhost:8000/event \
+curl -X POST http://localhost:8080/event \
   -H "Content-Type: application/json" \
   -d '{"inn": "7701234567", "query": "кабель", "ste_id": "123", "position": 1, "event_type": "click"}'
 ```
@@ -66,21 +66,21 @@ curl -X POST http://localhost:8000/event \
 Полные данные о товарной позиции.
 
 ```bash
-curl http://localhost:8000/ste/123
+curl http://localhost:8080/ste/123
 ```
 
 ### GET /suggest?inn={inn}
 Подсказка поискового запроса на основе истории пользователя.
 
 ```bash
-curl "http://localhost:8000/suggest?inn=7701234567"
+curl "http://localhost:8080/suggest?inn=7701234567"
 ```
 
 ### GET /explain?inn={inn}&query={query}
 Объяснение персонализации — последние 20 событий пользователя.
 
 ```bash
-curl "http://localhost:8000/explain?inn=7701234567&query=кабель"
+curl "http://localhost:8080/explain?inn=7701234567&query=кабель"
 ```
 
 ### GET /health
