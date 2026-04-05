@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
 from sqlmodel import Session, select
 
@@ -36,6 +36,22 @@ _INFLUENCE_LABELS = {
 async def suggest(inn: str):
     suggested_query = await ml_client.get_suggestion(inn)
     return SuggestResponse(suggested_query=suggested_query)
+
+
+@router.get("/api/autocomplete")
+async def autocomplete(q: str = Query(default=""), inn: str = Query(default="")):
+    """
+    Автодополнение поисковой строки — топ-6 подсказок.
+    Вызывается при каждом нажатии клавиши (debounce 150 мс на клиенте).
+    Учитывает опечатки (SymSpell), синонимы и поведение пользователя в сессии.
+    """
+    if len(q.strip()) < 2:
+        return {"suggestions": []}
+    result = await ml_client.suggest(q.strip(), inn)
+    if not result:
+        return {"suggestions": []}
+    suggestions = (result.get("suggestions") or [])[:6]
+    return {"suggestions": suggestions}
 
 
 @router.get("/explain", response_model=ExplainResponse)
