@@ -101,9 +101,14 @@ async def page_search(
         # ── Путь 1: ML-сервис (BM25 + LightGBM) ─────────────────────────────
         ml_response = await ml_client.search(q, inn, top_n=200)
 
+        # Скорректированный запрос из ML — используем в DB-поиске даже при fallback
+        ml_corrected_q = (
+            ml_response.get("corrected") if ml_response and ml_response.get("was_corrected") else None
+        )
+
         if ml_response:
             ml_results = ml_response.get("results") or []
-            suggested_query = ml_response.get("corrected") or None
+            suggested_query = ml_corrected_q
             is_personalized = bool(inn) and bool(ml_results)
 
             # ML отдаёт ste_id как int; в DB он хранится строкой
@@ -150,35 +155,51 @@ async def page_search(
             if sort == "price_asc":
                 results.sort(key=lambda x: price_map.get(x["ste_id"], float("inf")))
 
-        # ── Путь 2: fallback — ILIKE-поиск из DB ─────────────────────────────
-        else:
-            ste_query = (
-                select(SteItem, price_subq.c.min_price)
-                .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
-                .where(SteItem.name.ilike(f"%{q}%"))  # type: ignore[union-attr]
-            )
-            if category:
-                ste_query = ste_query.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
-            if _has_offers:
-                ste_query = ste_query.where(price_subq.c.min_price.is_not(None))
-            if _price_from is not None:
-                ste_query = ste_query.where(price_subq.c.min_price >= _price_from)
-            if _price_to is not None:
-                ste_query = ste_query.where(price_subq.c.min_price <= _price_to)
-            if sort == "price_asc":
-                ste_query = ste_query.order_by(price_subq.c.min_price.asc().nulls_last())
+        # ── Путь 2: DB ILIKE — ML недоступен или вернул 0 совпадений с DB ────
+        if not results:
+            effective_q = ml_corrected_q or q
 
-            for row in db.exec(ste_query).all():
-                item, min_price = row[0], row[1]
-                if min_price is not None:
-                    price_map[item.ste_id] = min_price
-                results.append({
-                    "ste_id":   item.ste_id,
-                    "name":     item.name,
-                    "category": item.category,
-                    "why_tags": [],
-                    "badges":   [],
-                })
+            def _ilike_search(search_q: str) -> list:
+                """Запускает ILIKE-поиск по search_q с применением текущих фильтров."""
+                sq = (
+                    select(SteItem, price_subq.c.min_price)
+                    .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
+                    .where(SteItem.name.ilike(f"%{search_q}%"))  # type: ignore[union-attr]
+                )
+                if category:
+                    sq = sq.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
+                if _has_offers:
+                    sq = sq.where(price_subq.c.min_price.is_not(None))
+                if _price_from is not None:
+                    sq = sq.where(price_subq.c.min_price >= _price_from)
+                if _price_to is not None:
+                    sq = sq.where(price_subq.c.min_price <= _price_to)
+                if sort == "price_asc":
+                    sq = sq.order_by(price_subq.c.min_price.asc().nulls_last())
+                rows_ = db.exec(sq).all()
+                out = []
+                for row_ in rows_:
+                    item_, min_price_ = row_[0], row_[1]
+                    if min_price_ is not None:
+                        price_map[item_.ste_id] = min_price_
+                    out.append({
+                        "ste_id":   item_.ste_id,
+                        "name":     item_.name,
+                        "category": item_.category,
+                        "why_tags": [],
+                        "badges":   [],
+                    })
+                return out
+
+            # Попытка 1: точный запрос (или скорректированный ML-ом)
+            results = _ilike_search(effective_q)
+
+            # Попытка 2: prefix-поиск по первым 3+ символам (спасает от опечаток
+            # когда ML недоступен и ILIKE на опечатке даёт 0).
+            # "флэг" → "флэ%" → найдёт "флэш", "флэшка" и пр.
+            if not results and not category and len(effective_q.strip()) >= 3:
+                prefix = effective_q.strip()[:3]
+                results = _ilike_search(prefix)
 
         # ── Значки «Часто покупаете» из DB ───────────────────────────────────
         if inn and results:
