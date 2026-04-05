@@ -342,7 +342,25 @@ async def page_card(
     best_offer = offers[0] if offers else None
 
     # ML-аналоги: похожие позиции дешевле (из обученного индекса)
-    ml_analogues = await ml_client.get_analogues(ste_id)
+    # Пересчитываем savings_pct относительно актуальной лучшей цены из БД,
+    # а не медианы из обучающих данных ML — они могут расходиться.
+    ml_analogues_raw = await ml_client.get_analogues(ste_id)
+    reference_price = best_offer["sum"] if best_offer else None
+    ml_analogues: list[dict] = []
+    for a in (ml_analogues_raw or []):
+        analogue_price = a.get("median_price")
+        if not analogue_price or analogue_price <= 0:
+            continue
+        if reference_price:
+            if analogue_price >= reference_price:
+                # Аналог не дешевле реальной лучшей цены — пропускаем
+                continue
+            savings = round((reference_price - analogue_price) / reference_price * 100, 1)
+        else:
+            # Нет реальных контрактов по текущей позиции — оставляем как есть
+            savings = a.get("savings_pct") or 0
+        ml_analogues.append({**a, "savings_pct": savings})
+    ml_analogues.sort(key=lambda x: x["savings_pct"], reverse=True)
 
     return templates.TemplateResponse(request, "card.html", {
         "ste": ste,
