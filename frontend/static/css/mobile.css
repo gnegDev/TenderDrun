@@ -135,6 +135,11 @@
   .sidebar { display: block !important; }
 }
 
+/* ── «Вы ранее смотрели» ─────────────────────────────────────── */
+.card--viewed {
+  border: 2px solid var(--red) !important;
+}
+
 /* ── Корзина: иконка в шапке ────────────────────────────────── */
 .cart-icon-btn {
   position: relative;

@@ -50,7 +50,9 @@
       <div class="carousel-track" style="display:flex;gap:16px;overflow-x:auto;padding-bottom:8px;">
         {% for item in recommended %}
         <a href="/card/{{ item.ste_id }}{% if inn %}?inn={{ inn }}{% endif %}"
-           class="product-card carousel-card" style="text-decoration:none;color:inherit;flex-shrink:0;">
+           class="product-card carousel-card"
+           data-ste-id="{{ item.ste_id }}"
+           style="text-decoration:none;color:inherit;flex-shrink:0;">
           <div class="card-icon-wrap">
             <span class="card-category">{{ item.category or 'СТЕ' }}</span>
             <span class="card-status" style="margin-left:auto">● Активна</span>

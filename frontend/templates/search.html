@@ -109,6 +109,7 @@
         {% for item in results %}
         <a href="/card/{{ item.ste_id }}?inn={{ inn }}&query={{ query | urlencode }}&position={{ loop.index }}"
            class="product-card grid-card"
+           data-ste-id="{{ item.ste_id }}"
            style="text-decoration:none;color:inherit;"
            onclick="trackClick('{{ item.ste_id }}', {{ loop.index }})">
 

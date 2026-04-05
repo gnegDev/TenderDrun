@@ -118,7 +118,32 @@
     if (span) span.textContent = 'В корзину';
   }
 
-  // Загружаем счётчик корзины и состояние кнопок при старте страницы
+  // ── «Вы ранее смотрели»: выделение красной рамкой ────────────────────────
+  // Работает полностью на клиенте через localStorage — в том числе при
+  // восстановлении страницы из bfcache (нажатие «Назад» в браузере).
+
+  function applyViewedBorders() {
+    if (!INN) return;
+    try {
+      var viewed = new Set(JSON.parse(localStorage.getItem('viewed_' + INN) || '[]'));
+      if (!viewed.size) return;
+      document.querySelectorAll('[data-ste-id]').forEach(function (el) {
+        if (viewed.has(el.dataset.steId)) {
+          el.classList.add('card--viewed');
+        }
+      });
+    } catch (e) {}
+  }
+
+  // Обычная загрузка страницы
+  document.addEventListener('DOMContentLoaded', applyViewedBorders);
+
+  // Восстановление из bfcache (браузер «Назад» / «Вперёд»)
+  window.addEventListener('pageshow', function (e) {
+    if (e.persisted) applyViewedBorders();
+  });
+
+  // ── Загружаем счётчик корзины и состояние кнопок при старте страницы ─────
   (function () {
     if (!INN) return;
     fetch('/api/cart?inn=' + encodeURIComponent(INN))
