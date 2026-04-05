@@ -5,7 +5,7 @@ from database import init_db
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
-from routes import events, pages, search, ste, suggest
+from routes import cart, events, pages, search, ste, suggest
 
 app = FastAPI(title="TenderDrun Search API", version="0.1.0")
 
@@ -25,6 +25,7 @@ app.include_router(search.router, prefix="/api")   # POST /api/search
 app.include_router(events.router, prefix="/api")   # POST /api/event
 app.include_router(ste.router)                     # GET  /ste/{ste_id}
 app.include_router(suggest.router)                 # GET  /suggest, GET /explain
+app.include_router(cart.router)                    # GET  /cart, /api/cart, DELETE /api/cart/{id}
 
 # HTML page routes — registered last to avoid shadowing API routes
 app.include_router(pages.router)

@@ -90,7 +90,17 @@
 
     <aside class="product-sidebar">
       <div class="offer-card">
-        {% if best_offer %}
+        {% if inn %}
+      <button class="cart-btn-large" id="page-cart-btn"
+              data-cart-ste-id="{{ ste.ste_id }}"
+              data-in-cart="false"
+              onclick="toggleCart('{{ ste.ste_id }}', this)">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+        <span class="cart-btn-label">В корзину</span>
+      </button>
+      {% endif %}
+
+      {% if best_offer %}
         <div class="offer-label">Лучшее предложение</div>
         <div class="offer-price">{{ best_offer.sum_fmt }}</div>
         <div class="offer-supplier">{{ best_offer.supplier }}</div>
