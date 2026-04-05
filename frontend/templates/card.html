@@ -113,6 +113,24 @@
         </div>
         {% endif %}
       </div>
+
+      {% if ml_analogues %}
+      <div class="offer-card" style="margin-top:16px;">
+        <div class="offer-label">Дешевле на рынке</div>
+        {% for a in ml_analogues %}
+        <a href="/card/{{ a.ste_id }}{% if inn %}?inn={{ inn }}{% endif %}"
+           class="offer-row" style="display:block;text-decoration:none;color:inherit;">
+          <div class="offer-row-price">
+            {{ '{:,}'.format(a.median_price | int).replace(',', '\xa0') }} ₽
+            {% if a.savings_pct and a.savings_pct > 0 %}
+            <span class="discount-badge">−{{ a.savings_pct | round | int }}%</span>
+            {% endif %}
+          </div>
+          <div class="offer-row-supplier" style="color:var(--black);font-size:12px;margin:2px 0;">{{ a.name }}</div>
+        </a>
+        {% endfor %}
+      </div>
+      {% endif %}
     </aside>
   </div>
 </main>
