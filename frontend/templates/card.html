@@ -139,24 +139,58 @@
 {% block scripts %}
 <script>
   const _enterTime = Date.now();
-  const _steId = "{{ ste.ste_id }}";
-  const _position = {{ position }};
-  let _beaconSent = false;
+  const _steId     = "{{ ste.ste_id }}";
+  const _position  = {{ position }};
+  let _beaconSent  = false;
+  let _dwellSent   = false;
+
+  // Проактивная отправка dwell-сигнала через 5 сек пока пользователь
+  // ещё на странице. Это гарантирует, что Redis обновится ДО того, как
+  // пользователь вернётся в поиск — иначе sendBeacon на уходе может
+  // прийти в ML позже нового поискового запроса (race condition).
+  const _DWELL_THRESHOLD_MS = 5000;
+  const _dwellTimer = INN && _steId
+    ? setTimeout(function () {
+        _dwellSent = true;
+        fetch('/api/event', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            inn:        INN,
+            query:      CURRENT_QUERY,
+            ste_id:     _steId,
+            position:   _position,
+            event_type: 'dwell',
+            dwell_ms:   _DWELL_THRESHOLD_MS,
+          }),
+        }).catch(function () {});
+      }, _DWELL_THRESHOLD_MS)
+    : null;
 
   function _sendLeaveEvent() {
     if (_beaconSent || !INN || !_steId) return;
     _beaconSent = true;
-    const dwellMs = Date.now() - _enterTime;
+    clearTimeout(_dwellTimer);
+
+    const dwellMs   = Date.now() - _enterTime;
     const eventType = dwellMs < 3000 ? 'quick_return' : 'dwell';
+
+    // Если проактивный dwell уже отправлен и фактическое время совпадает,
+    // повторно отправляем только если фактический dwell значимо больше
+    // (обновляем max в Redis).
+    if (_dwellSent && eventType === 'dwell' && dwellMs <= _DWELL_THRESHOLD_MS * 1.5) {
+      return;
+    }
+
     navigator.sendBeacon(
       '/api/event',
       new Blob([JSON.stringify({
-        inn: INN,
-        query: CURRENT_QUERY,
-        ste_id: _steId,
-        position: _position,
+        inn:        INN,
+        query:      CURRENT_QUERY,
+        ste_id:     _steId,
+        position:   _position,
         event_type: eventType,
-        dwell_ms: dwellMs,
+        dwell_ms:   dwellMs,
       })], { type: 'application/json' })
     );
   }

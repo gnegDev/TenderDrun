@@ -233,13 +233,18 @@ class Reranker:
             return []
 
         if self._ready:
-            X      = self._extractor.extract_batch(user_inn, candidates, session)
-            scores = self._model.predict(X)
+            X   = self._extractor.extract_batch(user_inn, candidates, session)
+            raw = self._model.predict(X)
+            # Нормируем в [0, 1] чтобы сессионные бусты (+0.15…+0.50) имели
+            # реальный вес. Без нормировки сырые LightGBM-скоры могут быть в
+            # диапазоне −10…+10, и добавка 0.25 не изменит порядок.
+            mn, mx_val = raw.min(), raw.max()
+            scores = (raw - mn) / (mx_val - mn + 1e-9)
         else:
             # Fallback: нормированный BM25 score
             bm_scores = np.array([c.get("bm25_score", 0.0) for c in candidates])
-            mx = bm_scores.max() or 1
-            scores = bm_scores / mx
+            mx_val = bm_scores.max() or 1
+            scores = bm_scores / mx_val
 
         # ── Сессионный буст: применяем поверх ML-скора ───────────────────────
         # Не требует переобучения — простая добавка к готовому score.
