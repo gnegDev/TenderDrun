@@ -139,6 +139,15 @@ class BM25Index:
         if self._bm25 is None:
             raise RuntimeError("BM25 не загружен — запусти ml.search_index")
         tokens = self._prep.tokenize(query)
+        return self._retrieve(tokens, top_k)
+
+    def search_tokens(self, tokens: list[str], top_k: int = 100) -> list[dict]:
+        """Принимает уже лемматизированные токены — без повторной токенизации."""
+        if self._bm25 is None:
+            raise RuntimeError("BM25 не загружен — запусти ml.search_index")
+        return self._retrieve(tokens, top_k)
+
+    def _retrieve(self, tokens: list[str], top_k: int) -> list[dict]:
         if not tokens:
             return []
         # Дедупликация: повторяющиеся токены не дают прироста качества BM25,
@@ -277,11 +286,14 @@ class SpellChecker:
             return query, False
         words, fixed_any = [], False
         for w in query.split():
-            sugg = self._sym.lookup(w, self._Verbosity.CLOSEST, max_edit_distance=2)
-            if sugg and sugg[0].term != w:
-                words.append(sugg[0].term); fixed_any = True
+            # SymSpell словарь строился в lowercase — приводим к тому же виду
+            w_lower = w.lower()
+            sugg = self._sym.lookup(w_lower, self._Verbosity.CLOSEST, max_edit_distance=2)
+            if sugg and sugg[0].term != w_lower:
+                words.append(sugg[0].term)
+                fixed_any = True
             else:
-                words.append(w)
+                words.append(w_lower)
         return " ".join(words), fixed_any
 
 
@@ -639,8 +651,12 @@ class BundleRecommender:
 
         log.info(f"  Bundle rules: {len(self._rules):,} СТЕ")
 
-    def get(self, ste_id: int) -> list[dict]:
-        return self._rules.get(ste_id, [])
+    def get(self, ste_id) -> list[dict]:
+        """Поддерживает и int, и str ste_id — ключи могут отличаться в зависимости от данных."""
+        r = self._rules.get(ste_id)
+        if r is None:
+            r = self._rules.get(int(ste_id) if isinstance(ste_id, str) and ste_id.isdigit() else str(ste_id))
+        return r or []
 
     def save(self, path: Path) -> None:
         with open(path, "wb") as f:
@@ -742,8 +758,12 @@ class PriceAnalogueIndex:
             f"(из {len(tokenized):,} с ценой)"
         )
 
-    def get(self, ste_id: int) -> list[dict]:
-        return self._index.get(ste_id, [])
+    def get(self, ste_id) -> list[dict]:
+        """Поддерживает и int, и str ste_id — ключи могут отличаться в зависимости от данных."""
+        r = self._index.get(ste_id)
+        if r is None:
+            r = self._index.get(int(ste_id) if isinstance(ste_id, str) and ste_id.isdigit() else str(ste_id))
+        return r or []
 
     def save(self, path: Path) -> None:
         with open(path, "wb") as f:
@@ -785,15 +805,39 @@ class SearchEngine:
         """
         Возвращает (candidates, analysis).
         analysis = {corrected, was_corrected, synonyms_added}
+
+        Стратегия:
+          1. Пробуем скорректированный запрос.
+          2. Если BM25 даёт 0 результатов — откатываемся к оригиналу.
+          3. Если всё равно 0 — ищем по каждому токену отдельно и объединяем.
         """
         corrected, was_corrected = self.spell.correct(query)
-        tokens  = self.prep.tokenize(corrected)
+        tokens = self.prep.tokenize(corrected)
         exp_tok, syns_added = self.synonyms.expand(tokens)
-        candidates = self.bm25.search(" ".join(exp_tok), top_k=top_k)
+        candidates = self.bm25.search_tokens(exp_tok, top_k=top_k)
+
+        # Fallback 1: коррекция привела в другую семантическую область — пробуем оригинал
+        if not candidates and was_corrected:
+            orig_tokens = self.prep.tokenize(query)
+            orig_exp, orig_syns = self.synonyms.expand(orig_tokens)
+            orig_candidates = self.bm25.search_tokens(orig_exp, top_k=top_k)
+            if orig_candidates:
+                candidates, exp_tok, syns_added = orig_candidates, orig_exp, orig_syns
+                corrected, was_corrected = query, False
+
+        # Fallback 2: всё ещё 0 — ищем по каждому токену отдельно
+        if not candidates:
+            seen: set = set()
+            for tok in (exp_tok or self.prep.tokenize(query)):
+                for c in self.bm25.search_tokens([tok], top_k=top_k):
+                    if c["ste_id"] not in seen:
+                        seen.add(c["ste_id"])
+                        candidates.append(c)
+
         analysis = {
-            "original":      query,
-            "corrected":     corrected if was_corrected else None,
-            "was_corrected": was_corrected,
+            "original":       query,
+            "corrected":      corrected if was_corrected else None,
+            "was_corrected":  was_corrected,
             "synonyms_added": syns_added,
         }
         return candidates, analysis
