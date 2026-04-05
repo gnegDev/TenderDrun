@@ -78,7 +78,7 @@ async def page_search(
     has_offers: str = "",
     db: Session = Depends(get_db),
 ):
-    results = []
+    results: list[dict] = []
     total = 0
     suggested_query = None
     is_personalized = False
@@ -88,10 +88,7 @@ async def page_search(
     _price_to = float(price_to.strip()) if price_to.strip() else None
 
     if q:
-        from sqlalchemy import Float, literal_column, text
-        from sqlalchemy.orm import aliased
-
-        # Подзапрос: лучшая цена по каждой СТЕ
+        # Подзапрос лучшей цены — используется в обоих путях (ML и fallback)
         price_subq = (
             select(Contract.ste_id, func.min(Contract.contract_sum).label("min_price"))
             .where(Contract.contract_sum.is_not(None))  # type: ignore[union-attr]
@@ -99,89 +96,104 @@ async def page_search(
             .subquery()
         )
 
-        ste_query = (
-            select(SteItem, price_subq.c.min_price)
-            .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
-            .where(SteItem.name.ilike(f"%{q}%"))  # type: ignore[union-attr]
-        )
-
-        if category:
-            ste_query = ste_query.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
-
-        if _has_offers:
-            ste_query = ste_query.where(price_subq.c.min_price.is_not(None))
-
-        if _price_from is not None:
-            ste_query = ste_query.where(price_subq.c.min_price >= _price_from)
-
-        if _price_to is not None:
-            ste_query = ste_query.where(price_subq.c.min_price <= _price_to)
-
-        if sort == "price_asc":
-            ste_query = ste_query.order_by(price_subq.c.min_price.asc().nulls_last())
-
-        rows = db.exec(ste_query).all()
-
-        # Строим price_map и список кандидатов из одного запроса
         price_map: dict[str, float] = {}
-        candidates = []
-        for row in rows:
-            ste_item = row[0]
-            min_price = row[1]
-            if min_price is not None:
-                price_map[ste_item.ste_id] = min_price
-            candidates.append({
-                "ste_id": ste_item.ste_id,
-                "name": ste_item.name,
-                "category": ste_item.category,
-                "bm25_score": 1.0,
-            })
 
-        if inn and candidates:
-            history_orm = db.exec(
-                select(UserEvent)
-                .where(UserEvent.inn == inn)
-                .order_by(UserEvent.created_at.desc())  # type: ignore[arg-type]
-                .limit(50)
-            ).all()
-            history = [
-                {"ste_id": e.ste_id, "event_type": e.event_type, "dwell_ms": e.dwell_ms}
-                for e in history_orm
-            ]
-            ml_response = await ml_client.get_ranked_results(q, inn, candidates, history)
-            if ml_response and ml_response.get("results"):
-                results = ml_response["results"]
-                suggested_query = ml_response.get("suggested_query")
-                is_personalized = True
-                if sort == "price_asc":
-                    results.sort(key=lambda x: price_map.get(x["ste_id"], float("inf")))
-            else:
-                results = candidates
+        # ── Путь 1: ML-сервис (BM25 + LightGBM) ─────────────────────────────
+        ml_response = await ml_client.search(q, inn, top_n=200)
+
+        if ml_response:
+            ml_results = ml_response.get("results") or []
+            suggested_query = ml_response.get("corrected") or None
+            is_personalized = bool(inn) and bool(ml_results)
+
+            # ML отдаёт ste_id как int; в DB он хранится строкой
+            ml_ids = [str(r["ste_id"]) for r in ml_results]
+
+            # Применяем фильтры из DB на кандидатах ML
+            ste_query = (
+                select(SteItem, price_subq.c.min_price)
+                .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
+                .where(SteItem.ste_id.in_(ml_ids))  # type: ignore[attr-defined]
+            )
+            if category:
+                ste_query = ste_query.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
+            if _has_offers:
+                ste_query = ste_query.where(price_subq.c.min_price.is_not(None))
+            if _price_from is not None:
+                ste_query = ste_query.where(price_subq.c.min_price >= _price_from)
+            if _price_to is not None:
+                ste_query = ste_query.where(price_subq.c.min_price <= _price_to)
+
+            rows = db.exec(ste_query).all()
+
+            valid_ids: set[str] = set()
+            for row in rows:
+                item, min_price = row[0], row[1]
+                valid_ids.add(item.ste_id)
+                if min_price is not None:
+                    price_map[item.ste_id] = min_price
+
+            # Сохраняем ML-порядок, убираем позиции, не прошедшие DB-фильтры
+            for r in ml_results:
+                sid = str(r["ste_id"])
+                if sid not in valid_ids:
+                    continue
+                results.append({
+                    "ste_id":    sid,
+                    "name":      r.get("name", ""),
+                    "category":  r.get("category", ""),
+                    "ml_score":  r.get("ml_score", 0.0),
+                    "why_tags":  r.get("why_tags") or [],
+                    "badges":    [],
+                })
+
+            if sort == "price_asc":
+                results.sort(key=lambda x: price_map.get(x["ste_id"], float("inf")))
+
+        # ── Путь 2: fallback — ILIKE-поиск из DB ─────────────────────────────
         else:
-            results = candidates
+            ste_query = (
+                select(SteItem, price_subq.c.min_price)
+                .outerjoin(price_subq, SteItem.ste_id == price_subq.c.ste_id)
+                .where(SteItem.name.ilike(f"%{q}%"))  # type: ignore[union-attr]
+            )
+            if category:
+                ste_query = ste_query.where(SteItem.category.ilike(f"%{category}%"))  # type: ignore[union-attr]
+            if _has_offers:
+                ste_query = ste_query.where(price_subq.c.min_price.is_not(None))
+            if _price_from is not None:
+                ste_query = ste_query.where(price_subq.c.min_price >= _price_from)
+            if _price_to is not None:
+                ste_query = ste_query.where(price_subq.c.min_price <= _price_to)
+            if sort == "price_asc":
+                ste_query = ste_query.order_by(price_subq.c.min_price.asc().nulls_last())
 
-        if sort == "relevance":
-            results.sort(key=lambda x: x.get("score", 0), reverse=True)
+            for row in db.exec(ste_query).all():
+                item, min_price = row[0], row[1]
+                if min_price is not None:
+                    price_map[item.ste_id] = min_price
+                results.append({
+                    "ste_id":   item.ste_id,
+                    "name":     item.name,
+                    "category": item.category,
+                    "why_tags": [],
+                    "badges":   [],
+                })
 
-        # Обогатить значками
-        if inn:
+        # ── Значки «Часто покупаете» из DB ───────────────────────────────────
+        if inn and results:
             purchased_ids = {
                 row[0]
                 for row in db.exec(select(Contract.ste_id).where(Contract.inn == inn)).all()
             }
             for item in results:
-                item["badges"] = []
-                if item["ste_id"] in purchased_ids:
+                if item["ste_id"] in purchased_ids and "frequent" not in item["badges"]:
                     item["badges"].append("frequent")
-                if item.get("score", 0) > 0.8:
-                    item["badges"].append("ai")
 
         total = len(results)
-
         offset = (page - 1) * page_size
         results = results[offset : offset + page_size]
 
-        # Добавить best_price из уже построенного price_map
         for item in results:
             price = price_map.get(item["ste_id"])
             item["best_price"] = f"от {int(price):,} ₽".replace(",", "\u00a0") if price else None
@@ -308,6 +320,9 @@ async def page_card(
 
     best_offer = offers[0] if offers else None
 
+    # ML-аналоги: похожие позиции дешевле (из обученного индекса)
+    ml_analogues = await ml_client.get_analogues(ste_id)
+
     return templates.TemplateResponse(request, "card.html", {
         "ste": ste,
         "attributes": attributes,
@@ -321,4 +336,5 @@ async def page_card(
         "badges": badges,
         "offers": offers,
         "best_offer": best_offer,
+        "ml_analogues": ml_analogues,
     })

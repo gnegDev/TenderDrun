@@ -2,8 +2,16 @@ FROM python:3.11-slim
 
 WORKDIR /app
 
-RUN pip install --no-cache-dir fastapi==0.135.3 uvicorn==0.34.0 pydantic==2.12.5
+# Системные зависимости для pymorphy3 и scipy
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    gcc g++ \
+    && rm -rf /var/lib/apt/lists/*
 
-COPY main.py .
+COPY requirements.txt .
+RUN pip install --no-cache-dir -r requirements.txt
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8001"]
+COPY api/     api/
+COPY config/  config/
+COPY ml/      ml/
+
+CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
