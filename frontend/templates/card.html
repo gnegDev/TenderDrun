@@ -150,6 +150,19 @@
 <script>
   const _enterTime = Date.now();
   const _steId     = "{{ ste.ste_id }}";
+
+  // Сохраняем просмотренный товар в localStorage сразу при входе на карточку.
+  // Ключ привязан к ИНН — у разных пользователей своя история.
+  if (INN && _steId) {
+    try {
+      var _vKey  = 'viewed_' + INN;
+      var _vList = JSON.parse(localStorage.getItem(_vKey) || '[]');
+      if (!_vList.includes(_steId)) {
+        _vList.unshift(_steId);
+        localStorage.setItem(_vKey, JSON.stringify(_vList.slice(0, 500)));
+      }
+    } catch (e) {}
+  }
   const _position  = {{ position }};
   let _beaconSent  = false;
   let _dwellSent   = false;
