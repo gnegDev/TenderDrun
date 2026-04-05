@@ -1,7 +1,7 @@
 from datetime import datetime
 from typing import Optional
 
-from  sqlmodel import Field, SQLModel
+from sqlmodel import Field, SQLModel
 
 
 class SteItem(SQLModel, table=True):
@@ -40,6 +40,17 @@ class UserEvent(SQLModel, table=True):
     event_type: str  # click | dwell | quick_return | target_action | impression_skip
     dwell_ms: Optional[int] = None
     created_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class CartItem(SQLModel, table=True):
+    __tablename__ = "cart_items"
+
+    id: Optional[int] = Field(default=None, primary_key=True)
+    inn: str = Field(index=True)
+    ste_id: str = Field(index=True)
+    ste_name: str = ""
+    ste_category: Optional[str] = None
+    added_at: datetime = Field(default_factory=datetime.utcnow)
 
 
 class SearchLog(SQLModel, table=True):

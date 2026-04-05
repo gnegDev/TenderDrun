@@ -1,0 +1,93 @@
+{% extends "base.html" %}
+{% block title %}Корзина — Портал Поставщиков{% endblock %}
+{% block content %}
+<main>
+  <div class="breadcrumb">
+    <a href="/search{% if inn %}?inn={{ inn }}{% endif %}">← Вернуться к поиску</a>
+    <span>›</span>
+    <span>Корзина</span>
+  </div>
+
+  <div style="max-width:900px;margin:0 auto;padding:24px 24px 48px;">
+    <h1 style="font-size:24px;font-weight:700;margin-bottom:24px;">
+      Корзина
+      {% if items %}
+      <span style="font-size:16px;font-weight:400;color:var(--gray);margin-left:8px;">{{ items | length }} позиц{{ 'ия' if items | length == 1 else ('ии' if items | length in [2,3,4] else 'ий') }}</span>
+      {% endif %}
+    </h1>
+
+    {% if not inn %}
+    <div class="personal-box" style="max-width:480px;">
+      <div class="personal-box-header">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        Войдите, чтобы увидеть корзину
+      </div>
+      <p>Введите ИНН организации в шапке страницы — корзина привязана к вашему ИНН.</p>
+    </div>
+
+    {% elif not items %}
+    <div style="text-align:center;padding:64px 24px;color:var(--gray);">
+      <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.2" style="opacity:.4;margin-bottom:16px;display:block;margin-left:auto;margin-right:auto;"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+      <div style="font-size:18px;font-weight:600;color:var(--black);margin-bottom:8px;">Корзина пуста</div>
+      <div style="font-size:14px;margin-bottom:24px;">Добавляйте товары из результатов поиска или с карточки товара</div>
+      <a href="/search?inn={{ inn }}" class="auth-btn" style="text-decoration:none;display:inline-block;">Перейти к поиску</a>
+    </div>
+
+    {% else %}
+    <div class="cart-list" id="cart-list">
+      {% for item in items %}
+      <div class="cart-row" id="cart-row-{{ item.ste_id }}" data-ste-id="{{ item.ste_id }}">
+        <div class="cart-row-info">
+          <div class="cart-row-category">{{ item.ste_category or 'СТЕ' }}</div>
+          <a href="/card/{{ item.ste_id }}?inn={{ inn }}"
+             class="cart-row-name">{{ item.ste_name }}</a>
+          <div class="cart-row-meta">Добавлено {{ item.added_at.strftime('%d.%m.%Y %H:%M') }}</div>
+        </div>
+        <div class="cart-row-actions">
+          <a href="/card/{{ item.ste_id }}?inn={{ inn }}" class="cart-view-btn">Открыть</a>
+          <button class="cart-remove-btn"
+                  onclick="removeFromCart('{{ item.ste_id }}', '{{ inn }}')">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            Удалить
+          </button>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+
+    <div class="cart-footer">
+      <span style="color:var(--gray);font-size:14px;">
+        Итого позиций: <strong id="cart-total-count" style="color:var(--black);">{{ items | length }}</strong>
+      </span>
+      <a href="/search?inn={{ inn }}" class="auth-btn" style="text-decoration:none;">
+        Продолжить поиск
+      </a>
+    </div>
+    {% endif %}
+  </div>
+</main>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function removeFromCart(steId, inn) {
+    fetch('/api/cart/' + encodeURIComponent(steId) + '?inn=' + encodeURIComponent(inn), {
+      method: 'DELETE',
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        var row = document.getElementById('cart-row-' + steId);
+        if (row) row.remove();
+        var counter = document.getElementById('cart-total-count');
+        if (counter) counter.textContent = data.count;
+        updateCartBadge(data.count);
+        if (data.count === 0) {
+          document.getElementById('cart-list').innerHTML =
+            '<div style="text-align:center;padding:48px;color:var(--gray);">Корзина пуста</div>';
+        }
+        showToast('Товар удалён из корзины');
+      })
+      .catch(function () {});
+  }
+</script>
+{% endblock %}

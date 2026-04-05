@@ -20,6 +20,10 @@
     <div class="header-right">
       {% if inn %}
         <span style="font-size:14px;color:var(--gray)">ИНН: {{ inn }}</span>
+        <a href="/cart?inn={{ inn }}" class="cart-icon-btn" id="cart-header-btn" title="Корзина">
+          <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+          <span class="cart-badge" id="cart-badge" style="display:none">0</span>
+        </a>
         <a href="/" class="auth-btn" style="text-decoration:none">Выйти</a>
       {% else %}
         <form method="get" action="/" style="display:flex;gap:8px;align-items:center">
@@ -41,6 +45,96 @@
   const INN = "{{ inn }}";
   const CURRENT_QUERY = "{{ query | default('') }}";
   const BASE_URL = "";
+
+  // ── Корзина: глобальные функции ───────────────────────────────────────────
+
+  function updateCartBadge(count) {
+    var badge = document.getElementById('cart-badge');
+    if (!badge) return;
+    if (count > 0) {
+      badge.textContent = count > 99 ? '99+' : count;
+      badge.style.display = 'flex';
+    } else {
+      badge.style.display = 'none';
+    }
+  }
+
+  function addToCart(steId, btnEl) {
+    if (!INN) { showToast('Войдите через ИНН, чтобы добавить в корзину'); return; }
+    fetch('/api/cart', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ inn: INN, ste_id: steId }),
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        if (data.status === 'added') {
+          showToast('Добавлено в корзину');
+          updateCartBadge(data.count);
+          _setCartBtnInCart(btnEl);
+        } else if (data.status === 'already_in_cart') {
+          showToast('Уже в корзине');
+          _setCartBtnInCart(btnEl);
+        }
+      })
+      .catch(function () {});
+  }
+
+  function removeFromCartBtn(steId, btnEl) {
+    if (!INN) return;
+    fetch('/api/cart/' + encodeURIComponent(steId) + '?inn=' + encodeURIComponent(INN), {
+      method: 'DELETE',
+    })
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        showToast('Удалено из корзины');
+        updateCartBadge(data.count);
+        _setCartBtnNotInCart(btnEl, steId);
+      })
+      .catch(function () {});
+  }
+
+  function toggleCart(steId, btnEl) {
+    if (btnEl.dataset.inCart === 'true') {
+      removeFromCartBtn(steId, btnEl);
+    } else {
+      addToCart(steId, btnEl);
+    }
+  }
+
+  function _setCartBtnInCart(btn) {
+    if (!btn) return;
+    btn.dataset.inCart = 'true';
+    btn.classList.add('cart-btn--active');
+    var span = btn.querySelector('.cart-btn-label');
+    if (span) span.textContent = 'В корзине';
+  }
+
+  function _setCartBtnNotInCart(btn, steId) {
+    if (!btn) return;
+    btn.dataset.inCart = 'false';
+    btn.classList.remove('cart-btn--active');
+    var span = btn.querySelector('.cart-btn-label');
+    if (span) span.textContent = 'В корзину';
+  }
+
+  // Загружаем счётчик корзины и состояние кнопок при старте страницы
+  (function () {
+    if (!INN) return;
+    fetch('/api/cart?inn=' + encodeURIComponent(INN))
+      .then(function (r) { return r.json(); })
+      .then(function (data) {
+        updateCartBadge(data.count);
+        // Помечаем кнопки «В корзину» для товаров, которые уже в корзине
+        var inCartIds = new Set((data.items || []).map(function (i) { return String(i.ste_id); }));
+        document.querySelectorAll('[data-cart-ste-id]').forEach(function (btn) {
+          if (inCartIds.has(String(btn.dataset.cartSteId))) {
+            _setCartBtnInCart(btn);
+          }
+        });
+      })
+      .catch(function () {});
+  })();
 </script>
 <script src="/static/js/events.js"></script>
 <script src="/static/js/autocomplete.js"></script>
